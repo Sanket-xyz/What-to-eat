@@ -95,11 +95,11 @@
         }
 
         .food-bubble.meal-bubble {
-            background-color: rgba(249, 115, 22, 0.65);
+            background-color: rgba(249, 115, 22, 0.62);
         }
 
         .food-bubble.snack-bubble {
-            background-color: rgba(59, 130, 246, 0.65);
+            background-color: rgba(59, 130, 246, 0.62);
         }
 
         .food-bubble.is-center-focal {
@@ -186,28 +186,22 @@
     </header>
 
     <!-- Winner Celebration Card -->
-    <div id="winner-card" class="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-30 hidden w-[90%] max-w-sm">
-        <div class="glass-surface rounded-3xl p-4 shadow-2xl border border-white/25 flex items-center justify-between gap-3">
-            <div class="flex items-center gap-3 min-w-0">
-                <div id="winner-badge-icon" class="w-11 h-11 rounded-2xl bg-orange-500/80 flex items-center justify-center text-white font-extrabold text-lg shrink-0 shadow-inner">
-                    🍽️
+    <div id="winner-card" class="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-30 hidden w-[92%] max-w-md">
+        <div class="glass-surface rounded-3xl p-4 sm:p-5 shadow-2xl border border-white/25 flex items-center justify-between gap-3">
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                    <span id="winner-type-pill" class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-orange-500/30 text-orange-200">Meal</span>
+                    <span class="text-[11px] font-medium text-slate-400">Randomly Picked</span>
                 </div>
-                <div class="min-w-0">
-                    <div class="flex items-center gap-1.5">
-                        <span id="winner-type-pill" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-500/30 text-orange-200">Meal</span>
-                        <span class="text-[11px] text-slate-400">Selected</span>
-                    </div>
-                    <h2 id="winner-title" class="text-base sm:text-lg font-extrabold text-white truncate mt-0.5">Masoor</h2>
-                </div>
+                <h2 id="winner-title" class="text-lg sm:text-xl font-extrabold text-white truncate mt-1">Masoor</h2>
+                <p id="winner-subtitle" class="text-xs text-slate-300/85 mt-0.5">Centered on your watch dial and ready to enjoy.</p>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
-                <button id="btn-spin-again" type="button" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition cursor-pointer">
-                    Again
+                <button id="btn-spin-again" type="button" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-bold text-white transition cursor-pointer">
+                    Spin Again
                 </button>
-                <button id="btn-close-winner" type="button" aria-label="Close selection" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 transition cursor-pointer">
-                    <svg class="w-4 h-4" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
+                <button id="btn-close-winner" type="button" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-xs font-extrabold text-slate-950 shadow transition cursor-pointer">
+                    Let's Eat!
                 </button>
             </div>
         </div>
@@ -532,15 +526,39 @@
 
         function rebuildBubbles(resetCamera = true) {
             updateCountsUI();
-            const filtered = activeFilter === 'All'
-                ? allFoods
-                : allFoods.filter(f => f.type === activeFilter);
+
+            // Interleave Meals and Snacks proportionally when viewing "All" so orange & blue mix evenly
+            let displayList;
+            if (activeFilter === 'All') {
+                const meals = allFoods.filter(f => f.type === 'Meal');
+                const snacks = allFoods.filter(f => f.type === 'Snack');
+                displayList = [];
+
+                if (meals.length === 0 || snacks.length === 0) {
+                    displayList = [...allFoods];
+                } else {
+                    const total = meals.length + snacks.length;
+                    let mIdx = 0;
+                    let sIdx = 0;
+                    for (let i = 0; i < total; i++) {
+                        const expectedMeals = ((i + 1) * meals.length) / total;
+                        if (mIdx < meals.length && (sIdx >= snacks.length || mIdx + 0.5 <= expectedMeals)) {
+                            displayList.push(meals[mIdx++]);
+                        } else {
+                            displayList.push(snacks[sIdx++]);
+                        }
+                    }
+                }
+            } else {
+                displayList = allFoods.filter(f => f.type === activeFilter);
+            }
 
             bubbleLayerEl.innerHTML = '';
-            const baseSpacing = 128;
-            const hexCoords = generateHexSpiralCoords(filtered.length, baseSpacing);
+            // Tighter lattice spacing so adjacent bubbles hug the center cluster densely
+            const baseSpacing = 98;
+            const hexCoords = generateHexSpiralCoords(displayList.length, baseSpacing);
 
-            bubbleNodes = filtered.map((item, i) => {
+            bubbleNodes = displayList.map((item, i) => {
                 const pos = hexCoords[i] || { x: 0, y: 0 };
                 const lines = splitIntoBalancedLines(item.name);
 
@@ -668,8 +686,8 @@
                 const factor = Math.pow(Math.max(0, 1 - norm * 0.78), 2.15);
                 const diameter = minDiameter + (maxDiameter - minDiameter) * factor;
 
-                // Radial inward compaction so shrunken outer bubbles stay tightly packed
-                const radialPull = 1 - 0.30 * Math.min(1, dist / (lensRadius * 1.15));
+                // Strong radial inward compaction so smaller outer bubbles pack tightly around the center
+                const radialPull = 1 - 0.42 * Math.min(1, dist / (lensRadius * 1.1));
                 const screenX = centerX + rawX * radialPull - diameter * 0.5;
                 const screenY = centerY + rawY * radialPull - diameter * 0.5;
 
@@ -987,8 +1005,8 @@
         const filterBtns = document.querySelectorAll('.filter-btn');
         const winnerCardEl = document.getElementById('winner-card');
         const winnerTitleEl = document.getElementById('winner-title');
+        const winnerSubtitleEl = document.getElementById('winner-subtitle');
         const winnerTypePillEl = document.getElementById('winner-type-pill');
-        const winnerBadgeIconEl = document.getElementById('winner-badge-icon');
 
         filterBtns.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1016,13 +1034,12 @@
             winnerTitleEl.textContent = item.name;
             const isMeal = item.type === 'Meal';
             winnerTypePillEl.textContent = item.type;
-            winnerTypePillEl.className = `text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+            winnerTypePillEl.className = `text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
                 isMeal ? 'bg-orange-500/30 text-orange-200' : 'bg-blue-500/30 text-blue-200'
             }`;
-            winnerBadgeIconEl.className = `w-11 h-11 rounded-2xl flex items-center justify-center text-white font-extrabold text-xl shrink-0 shadow-inner ${
-                isMeal ? 'bg-orange-500/80' : 'bg-blue-500/80'
-            }`;
-            winnerBadgeIconEl.textContent = isMeal ? '🍛' : '🥨';
+            winnerSubtitleEl.textContent = isMeal
+                ? 'Hearty meal selected — ready to serve.'
+                : 'Tasty snack selected — ready to enjoy.';
             winnerCardEl.classList.remove('hidden');
         }
 
