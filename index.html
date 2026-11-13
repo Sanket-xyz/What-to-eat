@@ -3,24 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>What to Eat? — watchOS Honeycomb Picker</title>
+    <title>What to Eat — WatchOS Bubble Picker</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg-oled: #07080c;
-            --meal-fill: rgba(249, 115, 22, 0.72);
-            --meal-border: rgba(251, 146, 60, 0.55);
-            --snack-fill: rgba(59, 130, 246, 0.72);
-            --snack-border: rgba(96, 165, 250, 0.55);
-        }
-
+        /* Base OLED dark canvas & touch lockout */
         * {
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
             user-select: none;
+            -webkit-user-select: none;
         }
 
         html, body {
@@ -29,25 +25,25 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: var(--bg-oled);
+            background-color: #050507;
             color: #f8fafc;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             touch-action: none;
         }
 
-        /* Sleek dark OLED canvas with subtle ambient dot matrix so bubble transparency shines */
+        /* Ambient dot-matrix & subtle radial glow behind frosted bubbles */
         #watch-stage {
             position: fixed;
             inset: 0;
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
             cursor: grab;
-            background-color: var(--bg-oled);
+            background-color: #050507;
             background-image:
-                radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.035) 0%, transparent 62%),
-                radial-gradient(rgba(148, 163, 184, 0.16) 1px, transparent 1px);
-            background-size: 100% 100%, 26px 26px;
+                radial-gradient(circle at 50% 48%, rgba(249, 115, 22, 0.08) 0%, rgba(59, 130, 246, 0.06) 34%, rgba(5, 5, 7, 0) 70%),
+                radial-gradient(rgba(255, 255, 255, 0.09) 1px, transparent 1px);
+            background-size: 100% 100%, 22px 22px;
             background-position: center center, center center;
         }
 
@@ -55,89 +51,80 @@
             cursor: grabbing;
         }
 
-        /* Subtle center lens guide ring */
-        .center-reticle {
+        /* Subtle center lens target ring */
+        #center-reticle {
             position: fixed;
-            top: 50%;
             left: 50%;
+            top: 48%;
             width: 196px;
             height: 196px;
             transform: translate(-50%, -50%);
             border-radius: 9999px;
-            border: 1px dashed rgba(255, 255, 255, 0.08);
+            border: 1px dashed rgba(255, 255, 255, 0.09);
             pointer-events: none;
             z-index: 1;
         }
 
-        /* Bubble container positioned at viewport center (0,0 origin for transforms) */
-        #bubble-layer {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            z-index: 5;
+        /* Frosted glass HUD controls */
+        .glass-surface {
+            background: rgba(20, 22, 28, 0.72);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
         }
 
-        /* Individual Honeycomb Bubble (rendered at full 180px max diameter for razor-sharp text, scaled down via GPU transform) */
+        /* Food bubbles: flat semi-transparent colors + frosted backdrop blur */
         .food-bubble {
             position: absolute;
-            width: 180px;
-            height: 180px;
-            margin-left: -90px;
-            margin-top: -90px;
+            left: 0;
+            top: 0;
             border-radius: 9999px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             text-align: center;
-            padding: 14px;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+            will-change: transform, width, height, opacity;
             cursor: pointer;
-            will-change: transform, opacity;
             transition: box-shadow 0.2s ease, border-color 0.2s ease;
+            overflow: hidden;
         }
 
-        /* Strictly flat semi-transparent colors */
-        .food-bubble.type-meal {
-            background-color: var(--meal-fill);
-            border: 1.5px solid var(--meal-border);
+        .food-bubble.meal-bubble {
+            background-color: rgba(249, 115, 22, 0.65);
         }
 
-        .food-bubble.type-snack {
-            background-color: var(--snack-fill);
-            border: 1.5px solid var(--snack-border);
+        .food-bubble.snack-bubble {
+            background-color: rgba(59, 130, 246, 0.65);
         }
 
-        /* Roulette / Selected Ring */
-        .food-bubble.is-roulette {
-            border: 3px solid #fde047 !important;
-            box-shadow: 0 0 0 6px rgba(250, 204, 21, 0.28), 0 0 28px rgba(250, 204, 21, 0.55);
-            z-index: 40 !important;
+        .food-bubble.is-center-focal {
+            border: 1.5px solid rgba(255, 255, 255, 0.55);
+            box-shadow: 0 16px 42px rgba(0, 0, 0, 0.65);
         }
 
-        .food-bubble.is-selected {
-            border: 2.5px solid #ffffff !important;
-            box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.18), 0 12px 32px rgba(0, 0, 0, 0.65);
-            z-index: 35 !important;
+        .food-bubble.is-roulette-active {
+            border: 2.5px solid #ffffff;
+            box-shadow: 0 0 32px rgba(255, 255, 255, 0.75);
+            z-index: 50 !important;
         }
 
         .bubble-label {
             color: #ffffff;
             font-weight: 700;
-            line-height: 1.14;
+            line-height: 1.12;
             letter-spacing: -0.015em;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
             pointer-events: none;
-            white-space: pre;
-        }
-
-        /* Floating Glass UI */
-        .glass-surface {
-            background: rgba(18, 20, 28, 0.76);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.11);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            white-space: nowrap;
         }
 
         /* Allow text selection inside modal inputs */
@@ -146,209 +133,190 @@
             -webkit-user-select: text;
         }
 
-        /* Custom subtle scrollbar for modal */
+        /* Custom subtle scrollbars for modal */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
         ::-webkit-scrollbar-track {
-            background: transparent;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 9999px;
         }
         ::-webkit-scrollbar-thumb {
             background: rgba(255, 255, 255, 0.18);
             border-radius: 9999px;
         }
-
-        @keyframes pulse-ring {
-            0% { transform: translate(-50%, -50%) scale(0.96); opacity: 0.55; }
-            50% { transform: translate(-50%, -50%) scale(1.03); opacity: 0.9; }
-            100% { transform: translate(-50%, -50%) scale(0.96); opacity: 0.55; }
-        }
-        .reticle-pulse {
-            animation: pulse-ring 3.6s ease-in-out infinite;
-        }
     </style>
 </head>
 <body>
+    <!-- Main Interactive Honeycomb Stage -->
+    <main id="watch-stage" aria-label="Interactive Food Honeycomb">
+        <div id="center-reticle"></div>
+        <div id="bubble-layer" class="fixed inset-0 pointer-events-none"></div>
+    </main>
 
-    <!-- Main Interactive Watch Honeycomb Stage -->
-    <div id="watch-stage" aria-label="Interactive food honeycomb canvas">
-        <div class="center-reticle reticle-pulse"></div>
-        <canvas id="fx-canvas" class="fixed inset-0 pointer-events-none z-30"></canvas>
-        <div id="bubble-layer"></div>
-    </div>
-
-    <!-- Top Header & Active Center Indicator -->
-    <header class="fixed top-0 left-0 right-0 z-20 pointer-events-none px-4 pt-3 sm:pt-4 flex flex-col items-center">
+    <!-- Top Header & Live Center Focus Pill -->
+    <header class="fixed top-0 left-0 right-0 z-20 pointer-events-none px-3 sm:px-5 pt-3 sm:pt-4 flex flex-col items-center">
         <div class="w-full max-w-xl flex items-center justify-between gap-2">
-            <!-- App Title Pill -->
-            <div class="glass-surface pointer-events-auto px-3.5 py-2 rounded-full flex items-center gap-2 shadow-lg">
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-                <span class="text-xs sm:text-sm font-bold tracking-tight text-white">What to Eat</span>
-                <span id="total-badge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/10 text-slate-300">31</span>
+            <!-- Left Cluster: Title + Sound Toggle -->
+            <div class="flex items-center gap-2 pointer-events-auto">
+                <div class="glass-surface px-3.5 py-2 rounded-full flex items-center gap-2 shadow-lg">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                    <span class="text-xs sm:text-sm font-bold tracking-tight text-white">What to Eat</span>
+                    <span id="total-badge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/10 text-slate-300">31</span>
+                </div>
+
+                <button id="btn-toggle-sound" type="button" title="Toggle Crown Tick Sound" aria-label="Toggle Crown Tick Sound" aria-pressed="true" class="glass-surface hover:bg-white/15 active:scale-95 px-2.5 h-9 rounded-full flex items-center justify-center gap-1.5 text-emerald-300 shadow-lg transition cursor-pointer">
+                    <svg id="icon-sound-on" class="w-4 h-4 shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"/>
+                    </svg>
+                    <svg id="icon-sound-off" class="w-4 h-4 hidden shrink-0 text-slate-400" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6"/>
+                    </svg>
+                    <span id="sound-status-label" class="hidden sm:inline text-[11px] font-semibold tracking-tight">Sound On</span>
+                </button>
             </div>
 
             <!-- Live Center Focus Readout -->
-            <div id="center-focus-pill" class="glass-surface pointer-events-auto px-3.5 py-2 rounded-full flex items-center gap-2 shadow-lg max-w-[55%] sm:max-w-xs transition-all">
+            <div id="center-focus-pill" class="glass-surface pointer-events-auto px-3.5 py-2 rounded-full flex items-center gap-2 shadow-lg max-w-[46%] sm:max-w-xs">
                 <span id="focus-dot" class="w-2.5 h-2.5 rounded-full bg-orange-500 shrink-0"></span>
                 <span id="focus-name" class="text-xs sm:text-sm font-semibold text-white truncate">Masoor</span>
             </div>
         </div>
     </header>
 
-    <!-- Winner Celebration Card (Shown when Randomizer lands or user clicks "Choose This") -->
-    <div id="winner-overlay" class="fixed inset-x-0 top-16 sm:top-20 z-40 px-4 flex justify-center pointer-events-none hidden">
-        <div id="winner-card" class="glass-surface pointer-events-auto w-full max-w-sm rounded-3xl p-5 shadow-2xl border border-white/20 transform transition-all duration-300 scale-95 opacity-0">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[11px] font-bold uppercase tracking-widest text-amber-300">Today's Pick</span>
-                <button id="btn-close-winner" class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 transition" aria-label="Close card">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-            <div class="flex items-center gap-3 my-2">
-                <div id="winner-badge" class="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-orange-500/25 text-orange-300 border border-orange-400/40">
-                    Meal
+    <!-- Winner Celebration Card -->
+    <div id="winner-card" class="fixed top-16 sm:top-20 left-1/2 -translate-x-1/2 z-30 hidden w-[90%] max-w-sm">
+        <div class="glass-surface rounded-3xl p-4 shadow-2xl border border-white/25 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+                <div id="winner-badge-icon" class="w-11 h-11 rounded-2xl bg-orange-500/80 flex items-center justify-center text-white font-extrabold text-lg shrink-0 shadow-inner">
+                    🍽️
+                </div>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <span id="winner-type-pill" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-orange-500/30 text-orange-200">Meal</span>
+                        <span class="text-[11px] text-slate-400">Selected</span>
+                    </div>
+                    <h2 id="winner-title" class="text-base sm:text-lg font-extrabold text-white truncate mt-0.5">Masoor</h2>
                 </div>
             </div>
-            <h2 id="winner-title" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight mb-4">
-                Masoor daal
-            </h2>
-            <div class="flex gap-2.5">
-                <button id="btn-spin-again" class="flex-1 py-2.5 px-4 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-sm shadow-lg transition flex items-center justify-center gap-2 cursor-pointer">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    Spin Again
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button id="btn-spin-again" type="button" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition cursor-pointer">
+                    Again
                 </button>
-                <button id="btn-winner-done" class="py-2.5 px-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-semibold text-sm transition cursor-pointer">
-                    Done
+                <button id="btn-close-winner" type="button" aria-label="Close selection" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 transition cursor-pointer">
+                    <svg class="w-4 h-4" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Bottom Floating Dock: Filters + Randomizer + Sync -->
-    <footer class="fixed bottom-0 left-0 right-0 z-20 pointer-events-none px-3 pb-4 sm:pb-6 flex flex-col items-center gap-2.5">
-        <!-- Action Row: Pick Random & Sync Sheet -->
-        <div class="flex items-center gap-2.5 pointer-events-auto">
-            <button id="btn-random" class="glass-surface hover:bg-white/15 active:scale-95 text-white font-bold text-sm px-5 py-3 rounded-full shadow-xl transition flex items-center gap-2 cursor-pointer border border-white/15">
-                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <span>Pick Random</span>
-            </button>
+    <!-- Bottom Floating Dock: Filters, Pick Random, Sync Sheet -->
+    <nav class="fixed bottom-0 left-0 right-0 z-20 pointer-events-none px-3 sm:px-5 pb-4 sm:pb-6 flex flex-col items-center gap-2.5">
+        <p class="text-[11px] text-slate-400/80 font-medium tracking-wide pointer-events-none">
+            Swipe or scroll to browse • Tap a circle to center
+        </p>
 
-            <button id="btn-recenter" title="Center Grid" class="glass-surface hover:bg-white/15 active:scale-95 text-slate-200 p-3 rounded-full shadow-xl transition cursor-pointer" aria-label="Center honeycomb">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-            </button>
-
-            <button id="btn-open-sync" class="glass-surface hover:bg-white/15 active:scale-95 text-white font-semibold text-sm px-4 py-3 rounded-full shadow-xl transition flex items-center gap-2 cursor-pointer">
-                <svg class="w-4 h-4 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-                <span>Sync Sheet</span>
-            </button>
-        </div>
-
-        <!-- Category Filter Pill Bar -->
-        <nav class="glass-surface pointer-events-auto p-1.5 rounded-full flex items-center gap-1 shadow-2xl" aria-label="Food category filter">
-            <button class="filter-pill px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition cursor-pointer bg-white text-slate-950 shadow" data-filter="All">
-                All (<span id="count-all">31</span>)
-            </button>
-            <button class="filter-pill px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition cursor-pointer text-slate-200 hover:bg-white/10 flex items-center gap-1.5" data-filter="Meal">
-                <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
-                Meal (<span id="count-meal">12</span>)
-            </button>
-            <button class="filter-pill px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition cursor-pointer text-slate-200 hover:bg-white/10 flex items-center gap-1.5" data-filter="Snack">
-                <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                Snack (<span id="count-snack">19</span>)
-            </button>
-        </nav>
-    </footer>
-
-    <!-- Sync & Inventory Management Modal -->
-    <div id="sync-modal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm hidden items-center justify-center p-4">
-        <div class="glass-surface w-full max-w-lg max-h-[88vh] rounded-3xl shadow-2xl border border-white/15 flex flex-col overflow-hidden">
-            <!-- Modal Header -->
-            <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-                <div>
-                    <h2 class="text-lg font-bold text-white">Sync & Manage Food List</h2>
-                    <p class="text-xs text-slate-400">Update from Google Sheets, add an item, or paste rows</p>
-                </div>
-                <button id="btn-close-sync" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-slate-300 transition cursor-pointer" aria-label="Close modal">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <div class="glass-surface pointer-events-auto rounded-3xl p-2 shadow-2xl flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 max-w-xl w-full">
+            <!-- Category Filter Pills -->
+            <div class="flex items-center bg-black/40 p-1 rounded-2xl border border-white/10">
+                <button type="button" data-filter="All" class="filter-btn px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-white text-slate-950 shadow">
+                    All (<span id="count-all">31</span>)
+                </button>
+                <button type="button" data-filter="Meal" class="filter-btn px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer text-orange-300 hover:bg-white/10 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+                    Meal (<span id="count-meal">12</span>)
+                </button>
+                <button type="button" data-filter="Snack" class="filter-btn px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer text-blue-300 hover:bg-white/10 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                    Snack (<span id="count-snack">19</span>)
                 </button>
             </div>
 
-            <!-- Scrollable Modal Body -->
-            <div class="p-6 overflow-y-auto space-y-6">
-                <!-- 1. Live Google Sheet Sync -->
-                <section class="bg-white/5 rounded-2xl p-4 border border-white/10 space-y-3">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                                Live Google Sheet Sync
-                            </h3>
-                            <p class="text-xs text-slate-400 mt-0.5">
-                                Fetches latest items directly from your connected Google Sheet CSV export.
-                            </p>
-                        </div>
-                        <a href="https://docs.google.com/spreadsheets/d/1ofToy1guc3diQt7KPOu25qPFfMIXFMT-ECnoo-N9rZM/edit?gid=0#gid=0" target="_blank" rel="noopener noreferrer" class="text-xs text-sky-400 hover:text-sky-300 underline shrink-0">
-                            Open Sheet ↗
-                        </a>
-                    </div>
+            <!-- Action Buttons -->
+            <div class="flex items-center gap-1.5">
+                <button id="btn-random" type="button" class="px-3.5 py-2 rounded-2xl bg-gradient-to-r from-orange-500 to-blue-500 hover:brightness-110 active:scale-95 text-white text-xs font-extrabold shadow-lg flex items-center gap-1.5 transition cursor-pointer">
+                    <svg class="w-4 h-4 shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    <span>Pick Random</span>
+                </button>
 
-                    <button id="btn-fetch-sheet" class="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition flex items-center justify-center gap-2 cursor-pointer">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/></svg>
-                        <span>Fetch Latest from Google Sheet</span>
+                <button id="btn-open-sync" type="button" class="px-3 py-2 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-slate-200 text-xs font-bold border border-white/10 flex items-center gap-1.5 transition cursor-pointer">
+                    <svg class="w-4 h-4 shrink-0 text-emerald-400" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.1" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/>
+                    </svg>
+                    <span>Sync Sheet</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sync & Manage Foods Modal -->
+    <div id="sync-modal" class="fixed inset-0 z-40 hidden items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+        <div class="glass-surface w-full max-w-lg rounded-3xl p-5 sm:p-6 shadow-2xl border border-white/20 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10">
+                <div>
+                    <h3 class="text-base sm:text-lg font-extrabold text-white">Sync & Update Food List</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Fetch live from Google Sheets, quick-add an item, or paste rows.</p>
+                </div>
+                <button id="btn-close-sync" type="button" aria-label="Close modal" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 transition cursor-pointer">
+                    <svg class="w-4 h-4" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Status Banner inside Modal -->
+            <div id="sync-status-msg" class="hidden mt-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold"></div>
+
+            <!-- 1. Live Google Sheet Sync -->
+            <div class="mt-4 space-y-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    1. Google Sheet Link or Published CSV URL
+                </label>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input id="sheet-url-input" type="url" placeholder="https://docs.google.com/spreadsheets/d/..." class="flex-1 bg-black/50 border border-white/15 rounded-2xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400">
+                    <button id="btn-fetch-sheet" type="button" class="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs transition cursor-pointer shrink-0">
+                        Fetch Now
                     </button>
+                </div>
+                <p class="text-[11px] text-slate-400 leading-relaxed">
+                    Tip: In Google Sheets, make sure sharing is set to <span class="text-slate-200 font-semibold">Anyone with the link</span> or <span class="text-slate-200 font-semibold">File → Share → Publish to web (CSV)</span>.
+                </p>
+            </div>
 
-                    <div id="sync-status" class="hidden text-xs rounded-xl p-3 leading-relaxed"></div>
-                </section>
+            <!-- 2. Quick Add Single Item -->
+            <div class="mt-5 pt-4 border-t border-white/10 space-y-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    2. Quick Add Single Food
+                </label>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input id="quick-food-name" type="text" placeholder="e.g. Sabudana Khichdi" class="flex-1 bg-black/50 border border-white/15 rounded-2xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-400">
+                    <select id="quick-food-type" class="bg-black/60 border border-white/15 rounded-2xl px-3 py-2.5 text-xs font-bold text-white focus:outline-none">
+                        <option value="Meal">Meal (Orange)</option>
+                        <option value="Snack">Snack (Blue)</option>
+                    </select>
+                    <button id="btn-quick-add" type="button" class="px-4 py-2.5 rounded-2xl bg-white text-slate-950 hover:bg-slate-200 font-extrabold text-xs transition cursor-pointer shrink-0">
+                        + Add
+                    </button>
+                </div>
+            </div>
 
-                <!-- 2. Quick Add Single Item -->
-                <section class="bg-white/5 rounded-2xl p-4 border border-white/10 space-y-3">
-                    <h3 class="text-sm font-bold text-white">Quick Add Item</h3>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                        <input id="quick-add-name" type="text" placeholder="e.g., Upma or Sabudana Khichdi" class="flex-1 bg-black/40 border border-white/15 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-400">
-                        <div class="flex rounded-xl bg-black/40 p-1 border border-white/15 shrink-0">
-                            <button type="button" id="quick-type-meal" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500 text-white transition cursor-pointer">Meal</button>
-                            <button type="button" id="quick-type-snack" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer">Snack</button>
-                        </div>
-                        <button type="button" id="btn-quick-add" class="px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-sm transition cursor-pointer shrink-0">
-                            Add
-                        </button>
-                    </div>
-                </section>
-
-                <!-- 3. Bulk Paste / Edit from Excel or Sheets -->
-                <section class="bg-white/5 rounded-2xl p-4 border border-white/10 space-y-3">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-bold text-white">Bulk Paste / Edit</h3>
-                        <button type="button" id="btn-load-current-text" class="text-xs text-slate-400 hover:text-white underline cursor-pointer">
-                            Load current list
-                        </button>
-                    </div>
-                    <p class="text-xs text-slate-400">
-                        Paste rows directly from Excel or Google Sheets (tab-separated or comma-separated: <code class="text-slate-200">Food, Meal/Snack</code>).
-                    </p>
-                    <textarea id="bulk-textarea" rows="5" class="w-full bg-black/40 border border-white/15 rounded-xl p-3 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 font-mono" placeholder="Poha, Snack&#10;Dal Tadka, Meal"></textarea>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" id="btn-bulk-append" class="flex-1 py-2.5 px-3 rounded-xl bg-white/15 hover:bg-white/25 text-white font-semibold text-xs sm:text-sm transition cursor-pointer">
-                            Append Items
-                        </button>
-                        <button type="button" id="btn-bulk-replace" class="flex-1 py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm transition cursor-pointer">
-                            Replace All
-                        </button>
-                    </div>
-                </section>
-
-                <!-- Footer Reset Row -->
-                <div class="pt-1 flex items-center justify-between border-t border-white/10">
-                    <span class="text-xs text-slate-400">Saved automatically in browser</span>
-                    <button type="button" id="btn-reset-default" class="text-xs font-semibold text-rose-400 hover:text-rose-300 px-3 py-1.5 rounded-lg hover:bg-rose-500/10 transition cursor-pointer">
-                        Reset to Default (31)
+            <!-- 3. Bulk Paste from Excel / Google Sheets -->
+            <div class="mt-5 pt-4 border-t border-white/10 space-y-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                    3. Bulk Paste Rows (Food Name, Meal/Snack)
+                </label>
+                <textarea id="bulk-paste-input" rows="3" placeholder="Puran Poli, Meal&#10;Bhel, Snack" class="w-full bg-black/50 border border-white/15 rounded-2xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"></textarea>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <button id="btn-reset-default" type="button" class="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/15 text-[11px] font-semibold text-slate-400 hover:text-white transition cursor-pointer">
+                        Reset to Original 31 Items
+                    </button>
+                    <button id="btn-apply-paste" type="button" class="px-4 py-2 rounded-2xl bg-blue-500 hover:bg-blue-400 text-white font-extrabold text-xs transition cursor-pointer">
+                        Replace with Pasted List
                     </button>
                 </div>
             </div>
@@ -358,439 +326,415 @@
     <script>
         /**
          * ============================================================================
-         * 1. DATASET & PERSISTENCE (31 Pre-loaded Items + LocalStorage)
+         * 1. INITIAL DATASET (FROM USER'S GOOGLE SHEET: 12 MEALS + 19 SNACKS = 31)
          * ============================================================================
          */
-        const STORAGE_KEY = 'watchos_honeycomb_foods_v1';
-        const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1ofToy1guc3diQt7KPOu25qPFfMIXFMT-ECnoo-N9rZM/export?format=csv&gid=0';
+        const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ofToy1guc3diQt7KPOu25qPFfMIXFMT-ECnoo-N9rZM/edit?gid=0#gid=0';
+        const STORAGE_KEY_FOODS = 'what_to_eat_foods_v2';
+        const STORAGE_KEY_SHEET_URL = 'what_to_eat_sheet_url_v2';
+        const SOUND_PREF_KEY = 'what_to_eat_sound_enabled_v2';
 
-        const DEFAULT_MEALS = [
-            'Masoor', 'Moog', 'Masoor daal', 'Chhole', 'Mixed daal', 'Idli pith',
-            'Daliya', 'Farsan (Misal)', 'Waal', 'Bhakti', 'Besan (Pithla)', 'Ghewada'
+        const DEFAULT_FOODS = [
+            // Meals (12)
+            { name: 'Masoor', type: 'Meal' },
+            { name: 'Moog', type: 'Meal' },
+            { name: 'Masoor daal', type: 'Meal' },
+            { name: 'Chhole', type: 'Meal' },
+            { name: 'Mixed daal', type: 'Meal' },
+            { name: 'Idli pith', type: 'Meal' },
+            { name: 'Daliya', type: 'Meal' },
+            { name: 'Farsan (Misal)', type: 'Meal' },
+            { name: 'Waal', type: 'Meal' },
+            { name: 'Bhakti', type: 'Meal' },
+            { name: 'Besan (Pithla)', type: 'Meal' },
+            { name: 'Ghewada', type: 'Meal' },
+            // Snacks (19)
+            { name: 'Shev', type: 'Snack' },
+            { name: 'Tikhat puri', type: 'Snack' },
+            { name: 'Shankarpali', type: 'Snack' },
+            { name: 'Dink ladu', type: 'Snack' },
+            { name: 'Besan laadu', type: 'Snack' },
+            { name: 'Chakli', type: 'Snack' },
+            { name: 'Karanji', type: 'Snack' },
+            { name: 'Pohe', type: 'Snack' },
+            { name: 'Shengdane', type: 'Snack' },
+            { name: 'Tomato sticks', type: 'Snack' },
+            { name: 'Khakara', type: 'Snack' },
+            { name: 'Paani Puri', type: 'Snack' },
+            { name: 'Chikki', type: 'Snack' },
+            { name: 'Fruba', type: 'Snack' },
+            { name: 'Futane', type: 'Snack' },
+            { name: 'Shevaya', type: 'Snack' },
+            { name: 'Shengadne chutney', type: 'Snack' },
+            { name: 'Jawas chutney', type: 'Snack' },
+            { name: 'Papad', type: 'Snack' }
         ];
 
-        const DEFAULT_SNACKS = [
-            'Shev', 'Tikhat puri', 'Shankarpali', 'Dink ladu', 'Besan laadu',
-            'Chakli', 'Karanji', 'Pohe', 'Shengdane', 'Tomato sticks', 'Khakara',
-            'Paani Puri', 'Chikki', 'Fruba', 'Futane', 'Shevaya',
-            'Shengadne chutney', 'Jawas chutney', 'Papad'
-        ];
-
-        function buildDefaultInventory() {
-            const list = [];
-            let uid = 1;
-            DEFAULT_MEALS.forEach(name => list.push({ id: `item-${uid++}`, name: name.trim(), type: 'Meal' }));
-            DEFAULT_SNACKS.forEach(name => list.push({ id: `item-${uid++}`, name: name.trim(), type: 'Snack' }));
-            return list;
-        }
-
-        function loadInventory() {
+        function loadFoods() {
             try {
-                const raw = localStorage.getItem(STORAGE_KEY);
+                const raw = localStorage.getItem(STORAGE_KEY_FOODS);
                 if (raw) {
                     const parsed = JSON.parse(raw);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        return parsed;
+                        return parsed.map((item, idx) => ({
+                            id: item.id || `food-${idx}-${item.name}`,
+                            name: String(item.name).trim(),
+                            type: String(item.type).toLowerCase().includes('meal') ? 'Meal' : 'Snack'
+                        }));
                     }
                 }
-            } catch (err) {
-                console.warn('Could not read localStorage, falling back to default list:', err);
-            }
-            return buildDefaultInventory();
+            } catch (_) {}
+            return DEFAULT_FOODS.map((item, idx) => ({
+                id: `food-${idx}-${item.name}`,
+                name: item.name,
+                type: item.type
+            }));
         }
 
-        function saveInventory(list) {
+        function saveFoods(list) {
             try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-            } catch (err) {
-                console.warn('Could not save to localStorage:', err);
-            }
+                localStorage.setItem(STORAGE_KEY_FOODS, JSON.stringify(list));
+            } catch (_) {}
         }
 
-        let inventory = loadInventory();
-        let activeFilter = 'All'; // 'All' | 'Meal' | 'Snack'
-        let selectedBubbleId = null;
+        let allFoods = loadFoods();
+        let activeFilter = 'All';
+        let bubbleNodes = [];
 
         /**
          * ============================================================================
-         * 2. SMART MULTI-LINE TEXT WRAPPING & EXACT FONT SIZING (ZERO "..." TRUNCATION)
+         * 2. HEXAGONAL SPIRAL HONEYCOMB COORDINATE GENERATOR
+         * ============================================================================
+         */
+        function generateHexSpiralCoords(count, spacing) {
+            const coords = [];
+            if (count <= 0) return coords;
+            coords.push({ x: 0, y: 0 });
+            if (count === 1) return coords;
+
+            // Axial hex directions (flat-top / pointy-top symmetric ring walk)
+            const dirs = [
+                { q: 1, r: 0 },
+                { q: 0, r: 1 },
+                { q: -1, r: 1 },
+                { q: -1, r: 0 },
+                { q: 0, r: -1 },
+                { q: 1, r: -1 }
+            ];
+
+            let ring = 1;
+            while (coords.length < count) {
+                let q = 0;
+                let r = -ring;
+                for (let side = 0; side < 6 && coords.length < count; side++) {
+                    for (let step = 0; step < ring && coords.length < count; step++) {
+                        const px = spacing * (Math.sqrt(3) * q + (Math.sqrt(3) / 2) * r);
+                        const py = spacing * ((3 / 2) * r);
+                        coords.push({ x: px, y: py });
+                        q += dirs[side].q;
+                        r += dirs[side].r;
+                    }
+                }
+                ring++;
+            }
+            return coords;
+        }
+
+        /**
+         * ============================================================================
+         * 3. FULL MULTI-LINE TEXT WRAPPING & EXACT FIT CALCULATION (ZERO "...")
          * ============================================================================
          */
         const measureCanvas = document.createElement('canvas');
         const measureCtx = measureCanvas.getContext('2d');
 
-        /**
-         * Splits multi-word names into balanced lines so every word fits comfortably
-         * inside a circular bubble without ever truncating with "...".
-         */
-        function wrapBubbleText(rawName) {
-            const name = rawName.trim().replace(/\s+/g, ' ');
-            const words = name.split(' ');
-            if (words.length <= 1) {
-                return [name];
-            }
-            if (words.length === 2) {
-                return [words[0], words[1]];
-            }
-            // For 3+ words, find split point that minimizes the longest line
-            let bestSplit = 1;
-            let bestMaxLen = Infinity;
-            for (let i = 1; i < words.length; i++) {
-                const line1 = words.slice(0, i).join(' ');
-                const line2 = words.slice(i).join(' ');
-                const maxLen = Math.max(line1.length, line2.length);
-                if (maxLen < bestMaxLen) {
-                    bestMaxLen = maxLen;
-                    bestSplit = i;
-                }
-            }
-            const first = words.slice(0, bestSplit).join(' ');
-            const second = words.slice(bestSplit).join(' ');
-            // If still very long (> 22 chars), split into 3 lines
-            if (Math.max(first.length, second.length) > 16 && words.length >= 3) {
-                return words;
-            }
-            return [first, second];
+        function splitIntoBalancedLines(text) {
+            const words = text.trim().split(/\s+/);
+            if (words.length <= 1) return [text.trim()];
+            if (words.length === 2) return [words[0], words[1]];
+
+            // Split 3+ words into 2 or 3 balanced lines
+            const mid = Math.ceil(words.length / 2);
+            return [
+                words.slice(0, mid).join(' '),
+                words.slice(mid).join(' ')
+            ];
         }
 
-        /**
-         * Computes exact font size (in px for the 180px max-resolution bubble) so the
-         * wrapped lines fit cleanly inside the circle with comfortable padding.
-         */
-        function computeExactFontSize(lines, maxDiameter = 180) {
-            const lineCount = lines.length;
-            const lineHeight = 1.14;
-            // Chord width inside a circle shrinks slightly when stacking multiple lines
-            const horizontalChordFactor = lineCount === 1 ? 0.80 : (lineCount === 2 ? 0.74 : 0.64);
-            const maxAllowedWidth = maxDiameter * horizontalChordFactor;
-            const maxAllowedHeight = maxDiameter * 0.68;
+        function computeOptimalFontSize(lines, diameter) {
+            if (diameter < 26) return 7;
+            // Available inscribed safe box inside circle
+            const maxBoxWidth = diameter * 0.78;
+            const maxBoxHeight = diameter * 0.68;
 
-            const refSize = 24;
-            measureCtx.font = `700 ${refSize}px Inter, -apple-system, BlinkMacSystemFont, sans-serif`;
+            let fontSize = Math.min(24, Math.max(7.5, diameter * 0.19));
+            measureCtx.font = `700 ${fontSize}px Inter, -apple-system, sans-serif`;
 
-            let widestAtRef = 0;
+            let widestLine = 0;
             for (const line of lines) {
                 const w = measureCtx.measureText(line).width;
-                if (w > widestAtRef) widestAtRef = w;
+                if (w > widestLine) widestLine = w;
             }
 
-            const widthConstrainedSize = widestAtRef > 0 ? (maxAllowedWidth / widestAtRef) * refSize : 22;
-            const heightConstrainedSize = maxAllowedHeight / (lineCount * lineHeight);
+            const totalHeight = lines.length * (fontSize * 1.14);
+            const widthScale = widestLine > 0 ? maxBoxWidth / widestLine : 1;
+            const heightScale = totalHeight > 0 ? maxBoxHeight / totalHeight : 1;
+            const fitScale = Math.min(1, widthScale, heightScale);
 
-            // Clamp between 12px and 23.5px (at 180px center size; scales down proportionally with bubble)
-            return Math.max(12, Math.min(23.5, widthConstrainedSize, heightConstrainedSize));
+            return Math.max(7, fontSize * fitScale);
         }
 
         /**
          * ============================================================================
-         * 3. CONCENTRIC HEXAGONAL (HONEYCOMB) SPIRAL GENERATOR
-         * ============================================================================
-         * Generates axial coordinates (q, r) ordered by Euclidean distance from (0,0)
-         * so any filtered subset forms a tight, circularly balanced watchOS cluster.
-         */
-        function generateHoneycombCoords(count, spacing = 136) {
-            const candidates = [];
-            const maxRings = Math.ceil(Math.sqrt(count)) + 3;
-
-            for (let q = -maxRings; q <= maxRings; q++) {
-                for (let r = -maxRings; r <= maxRings; r++) {
-                    if (Math.abs(q + r) <= maxRings) {
-                        // Pointy-topped axial hex coordinates to Cartesian
-                        const x = spacing * (Math.sqrt(3) * q + (Math.sqrt(3) / 2) * r) / Math.sqrt(3);
-                        const y = spacing * (1.5 * r) / Math.sqrt(3);
-                        const dist = Math.hypot(x, y);
-                        const angle = Math.atan2(y, x);
-                        candidates.push({ x, y, dist, angle });
-                    }
-                }
-            }
-
-            // Sort strictly by radial distance from center (0,0), breaking ties cleanly by angle
-            candidates.sort((a, b) => {
-                if (Math.abs(a.dist - b.dist) > 0.5) {
-                    return a.dist - b.dist;
-                }
-                return a.angle - b.angle;
-            });
-
-            return candidates.slice(0, count);
-        }
-
-        /**
-         * ============================================================================
-         * 4. WATCHOS FISHEYE LENS + RADIAL INWARD ATTRACTION MATH
-         * ============================================================================
-         * - Center bubbles (dist -> 0) scale to 1.0 of 180px = 180px diameter (1.36x base).
-         * - Outer bubbles shrink dramatically down to 0.23 of 180px = ~41px diameter.
-         * - Integrates scale radially so shrunken outer bubbles pull inward toward the
-         *   center, preventing empty gaps while guaranteeing zero bubble overlap.
-         */
-        const MAX_BUBBLE_PX = 180; // Full visual diameter at dead center
-        const MIN_SCALE = 0.235;   // 180 * 0.235 = ~42px diameter at outer edges
-        const MAX_SCALE = 1.0;     // 180 * 1.0 = 180px diameter at center
-
-        let lensRadius = 260;
-        const WARP_LUT_SIZE = 512;
-        const WARP_LUT_MAX_DIST = 1800;
-        const warpRatioLUT = new Float32Array(WARP_LUT_SIZE);
-
-        function evalScaleAtDist(dist) {
-            const t = dist / lensRadius;
-            // Smooth Gaussian-bell watchOS fisheye curve
-            const bell = Math.exp(-1.95 * t * t);
-            return MIN_SCALE + (MAX_SCALE - MIN_SCALE) * bell;
-        }
-
-        function rebuildLensLUT() {
-            const vw = window.innerWidth;
-            const vh = window.innerHeight;
-            // Adaptive lens radius so both phones and desktops have dramatic center-to-edge contrast
-            lensRadius = Math.max(195, Math.min(340, Math.min(vw, vh) * 0.44));
-
-            // Numerically integrate radial spacing compression so shrunken outer bubbles hug the center
-            let cumulativeWarped = 0;
-            const step = WARP_LUT_MAX_DIST / (WARP_LUT_SIZE - 1);
-            warpRatioLUT[0] = 1.24; // Slight expansion right around the 180px center bubble to prevent overlap
-
-            for (let i = 1; i < WARP_LUT_SIZE; i++) {
-                const rMid = (i - 0.5) * step;
-                const s = evalScaleAtDist(rMid);
-                // Map scale [0.235..1.0] to local radial spacing factor [0.34..1.25]
-                const localSpacingFactor = 0.34 + 0.91 * ((s - MIN_SCALE) / (MAX_SCALE - MIN_SCALE));
-                cumulativeWarped += step * localSpacingFactor;
-                const r = i * step;
-                warpRatioLUT[i] = cumulativeWarped / r;
-            }
-        }
-
-        function getWarpedRatio(dist) {
-            if (dist <= 0.001) return warpRatioLUT[0];
-            const idxFloat = (dist / WARP_LUT_MAX_DIST) * (WARP_LUT_SIZE - 1);
-            const idx = Math.floor(idxFloat);
-            if (idx >= WARP_LUT_SIZE - 1) return warpRatioLUT[WARP_LUT_SIZE - 1];
-            const frac = idxFloat - idx;
-            return warpRatioLUT[idx] + (warpRatioLUT[idx + 1] - warpRatioLUT[idx]) * frac;
-        }
-
-        /**
-         * ============================================================================
-         * 5. BUBBLE DOM RENDERING & REAL-TIME CAMERA / MOMENTUM ENGINE
+         * 4. BUILD & FILTER BUBBLE DOM NODES
          * ============================================================================
          */
         const stageEl = document.getElementById('watch-stage');
         const bubbleLayerEl = document.getElementById('bubble-layer');
-        const focusDotEl = document.getElementById('focus-dot');
         const focusNameEl = document.getElementById('focus-name');
+        const focusDotEl = document.getElementById('focus-dot');
 
-        let activeBubbles = []; // { item, bx, by, el, scale, screenX, screenY }
-        let maxClusterRadius = 200;
-
-        // Camera pan state (world offset)
+        // Camera pan state
         let panX = 0;
         let panY = 0;
         let velX = 0;
         let velY = 0;
 
-        // Smooth tween target (used for tap-to-center & randomizer hops)
+        // Mechanical crown detent tracking
+        let lastRenderPanX = 0;
+        let lastRenderPanY = 0;
+        let accumTickDistance = 0;
+        let lastCenterFocalId = null;
+        const CROWN_STEP_PX = 44;
+
+        // Smooth tween target (tap-to-center & randomizer)
         let tweenActive = false;
-        let tweenStartX = 0;
-        let tweenStartY = 0;
         let tweenTargetX = 0;
         let tweenTargetY = 0;
-        let tweenStartTime = 0;
-        let tweenDuration = 450;
-        let tweenOnComplete = null;
 
-        // Pointer drag state
+        // Drag state
         let isDragging = false;
         let dragStartX = 0;
         let dragStartY = 0;
         let lastPointerX = 0;
         let lastPointerY = 0;
-        let lastPointerTime = 0;
         let totalDragDist = 0;
         let isRouletteRunning = false;
 
-        function getFilteredItems() {
-            if (activeFilter === 'All') return inventory;
-            return inventory.filter(item => item.type === activeFilter);
+        function updateCountsUI() {
+            const mealsCount = allFoods.filter(f => f.type === 'Meal').length;
+            const snacksCount = allFoods.filter(f => f.type === 'Snack').length;
+            document.getElementById('total-badge').textContent = allFoods.length;
+            document.getElementById('count-all').textContent = allFoods.length;
+            document.getElementById('count-meal').textContent = mealsCount;
+            document.getElementById('count-snack').textContent = snacksCount;
         }
 
-        function updateCategoryCounts() {
-            const meals = inventory.filter(i => i.type === 'Meal').length;
-            const snacks = inventory.filter(i => i.type === 'Snack').length;
-            document.getElementById('count-all').textContent = inventory.length;
-            document.getElementById('count-meal').textContent = meals;
-            document.getElementById('count-snack').textContent = snacks;
-            document.getElementById('total-badge').textContent = inventory.length;
-        }
-
-        function rebuildHoneycomb(resetPan = true) {
-            updateCategoryCounts();
-            const items = getFilteredItems();
-            const coords = generateHoneycombCoords(items.length, 136);
+        function rebuildBubbles(resetCamera = true) {
+            updateCountsUI();
+            const filtered = activeFilter === 'All'
+                ? allFoods
+                : allFoods.filter(f => f.type === activeFilter);
 
             bubbleLayerEl.innerHTML = '';
-            activeBubbles = [];
-            maxClusterRadius = 120;
+            const baseSpacing = 128;
+            const hexCoords = generateHexSpiralCoords(filtered.length, baseSpacing);
 
-            items.forEach((item, idx) => {
-                const pos = coords[idx] || { x: 0, y: 0, dist: 0 };
-                if (pos.dist > maxClusterRadius) maxClusterRadius = pos.dist;
-
-                const lines = wrapBubbleText(item.name);
-                const fontSize = computeExactFontSize(lines, MAX_BUBBLE_PX);
+            bubbleNodes = filtered.map((item, i) => {
+                const pos = hexCoords[i] || { x: 0, y: 0 };
+                const lines = splitIntoBalancedLines(item.name);
 
                 const el = document.createElement('div');
-                el.className = `food-bubble ${item.type === 'Meal' ? 'type-meal' : 'type-snack'}`;
-                if (item.id === selectedBubbleId) {
-                    el.classList.add('is-selected');
-                }
-                el.dataset.id = item.id;
+                el.className = `food-bubble pointer-events-auto ${
+                    item.type === 'Meal' ? 'meal-bubble' : 'snack-bubble'
+                }`;
 
-                const labelSpan = document.createElement('span');
-                labelSpan.className = 'bubble-label';
-                labelSpan.style.fontSize = `${fontSize.toFixed(2)}px`;
-                labelSpan.textContent = lines.join('\n');
-                el.appendChild(labelSpan);
+                const labelEl = document.createElement('div');
+                labelEl.className = 'bubble-label';
+                lines.forEach(lineText => {
+                    const span = document.createElement('span');
+                    span.textContent = lineText;
+                    labelEl.appendChild(span);
+                });
+                el.appendChild(labelEl);
 
-                // Tap/click on bubble smoothly centers it
-                el.addEventListener('click', (e) => {
-                    if (totalDragDist > 8 || isRouletteRunning) return;
-                    e.stopPropagation();
-                    selectAndCenterBubble(bubbleObj);
+                // Tap-to-center handler (distinguished from swipe/drag)
+                el.addEventListener('pointerup', (e) => {
+                    if (isRouletteRunning) return;
+                    if (totalDragDist < 8) {
+                        e.stopPropagation();
+                        unlockAudioContext();
+                        centerOnBubble(node);
+                    }
                 });
 
                 bubbleLayerEl.appendChild(el);
 
-                const bubbleObj = {
+                const node = {
                     item,
-                    bx: pos.x,
-                    by: pos.y,
+                    lines,
+                    baseX: pos.x,
+                    baseY: pos.y,
                     el,
-                    scale: 1,
-                    screenX: 0,
-                    screenY: 0
+                    labelEl,
+                    lastFontSize: 0
                 };
-                activeBubbles.push(bubbleObj);
+                return node;
             });
 
-            if (resetPan) {
+            if (resetCamera) {
+                panX = 0;
+                panY = 0;
                 velX = 0;
                 velY = 0;
-                animatePanTo(0, 0, 380);
+                tweenActive = false;
+                lastRenderPanX = 0;
+                lastRenderPanY = 0;
+                lastCenterFocalId = bubbleNodes[0] ? bubbleNodes[0].item.id : null;
             }
-            renderFrame(performance.now());
         }
 
-        function animatePanTo(tx, ty, duration = 450, onComplete = null) {
-            tweenActive = true;
-            tweenStartX = panX;
-            tweenStartY = panY;
-            tweenTargetX = tx;
-            tweenTargetY = ty;
-            tweenStartTime = performance.now();
-            tweenDuration = duration;
-            tweenOnComplete = onComplete;
+        function centerOnBubble(node) {
+            if (!node) return;
             velX = 0;
             velY = 0;
+            tweenTargetX = -node.baseX;
+            tweenTargetY = -node.baseY;
+            tweenActive = true;
         }
 
-        function selectAndCenterBubble(bubbleObj, showCard = false) {
-            selectedBubbleId = bubbleObj.item.id;
-            activeBubbles.forEach(b => {
-                b.el.classList.toggle('is-selected', b.item.id === selectedBubbleId);
-            });
-            animatePanTo(-bubbleObj.bx, -bubbleObj.by, 460, () => {
-                if (showCard) {
-                    openWinnerCard(bubbleObj.item);
-                }
-            });
-        }
+        /**
+         * ============================================================================
+         * 5. WATCHOS FISHEYE LENS RENDER LOOP (60 FPS)
+         * ============================================================================
+         */
+        function renderFrame() {
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+            const centerX = vw * 0.5;
+            const centerY = vh * 0.48;
 
-        function renderFrame(now) {
-            // 1. Update tween or momentum physics
+            // Update camera motion (tween vs inertial momentum)
             if (tweenActive) {
-                const elapsed = now - tweenStartTime;
-                const progress = Math.min(1, elapsed / tweenDuration);
-                // Smooth cubic-out easing
-                const ease = 1 - Math.pow(1 - progress, 3);
-                panX = tweenStartX + (tweenTargetX - tweenStartX) * ease;
-                panY = tweenStartY + (tweenTargetY - tweenStartY) * ease;
-
-                if (progress >= 1) {
-                    tweenActive = false;
+                const dx = tweenTargetX - panX;
+                const dy = tweenTargetY - panY;
+                panX += dx * 0.16;
+                panY += dy * 0.16;
+                if (Math.hypot(dx, dy) < 0.4) {
                     panX = tweenTargetX;
                     panY = tweenTargetY;
-                    if (typeof tweenOnComplete === 'function') {
-                        const cb = tweenOnComplete;
-                        tweenOnComplete = null;
-                        cb();
-                    }
+                    tweenActive = false;
                 }
             } else if (!isDragging) {
-                // Apply smooth inertia
                 panX += velX;
                 panY += velY;
                 velX *= 0.91;
                 velY *= 0.91;
+                if (Math.abs(velX) < 0.04) velX = 0;
+                if (Math.abs(velY) < 0.04) velY = 0;
 
-                if (Math.abs(velX) < 0.02) velX = 0;
-                if (Math.abs(velY) < 0.02) velY = 0;
-
-                // Soft elastic boundary so user never pans completely away from the food cluster
-                const bound = Math.max(120, maxClusterRadius + 40);
+                // Soft elastic boundary so cluster never gets lost off-screen
+                const maxPanRadius = Math.max(220, Math.sqrt(bubbleNodes.length) * 95);
                 const panDist = Math.hypot(panX, panY);
-                if (panDist > bound) {
-                    const excess = panDist - bound;
-                    const pull = excess * 0.12;
-                    panX -= (panX / panDist) * pull;
-                    panY -= (panY / panDist) * pull;
+                if (panDist > maxPanRadius) {
+                    const pullBack = (panDist - maxPanRadius) * 0.08;
+                    panX -= (panX / panDist) * pullBack;
+                    panY -= (panY / panDist) * pullBack;
                 }
             }
 
-            // 2. Apply watchOS fisheye scale + inward radial warp to every bubble
+            // Fisheye parameters: strong dramatic size contrast (176px center -> 42px edge)
+            const maxDiameter = Math.min(180, Math.max(146, Math.min(vw, vh) * 0.34));
+            const minDiameter = 42;
+            const lensRadius = Math.min(vw, vh) * 0.52;
+
             let closestBubble = null;
             let closestDist = Infinity;
 
-            for (let i = 0; i < activeBubbles.length; i++) {
-                const b = activeBubbles[i];
-                const dx = b.bx + panX;
-                const dy = b.by + panY;
-                const dist = Math.hypot(dx, dy);
-
-                const scale = evalScaleAtDist(dist);
-                const warpRatio = getWarpedRatio(dist);
-
-                const wx = dx * warpRatio;
-                const wy = dy * warpRatio;
-
-                b.scale = scale;
-                b.screenX = wx;
-                b.screenY = wy;
-
-                // Opacity gently softens at the far periphery while keeping flat colors crisp
-                const opacity = Math.max(0.42, Math.min(1, 0.35 + scale * 0.85));
-                const zIndex = Math.round(scale * 30);
-
-                b.el.style.transform = `translate3d(${wx.toFixed(2)}px, ${wy.toFixed(2)}px, 0) scale(${scale.toFixed(4)})`;
-                b.el.style.opacity = opacity.toFixed(3);
-                if (!b.el.classList.contains('is-roulette') && !b.el.classList.contains('is-selected')) {
-                    b.el.style.zIndex = zIndex;
-                }
+            for (let i = 0; i < bubbleNodes.length; i++) {
+                const node = bubbleNodes[i];
+                const rawX = node.baseX + panX;
+                const rawY = node.baseY + panY;
+                const dist = Math.hypot(rawX, rawY);
 
                 if (dist < closestDist) {
                     closestDist = dist;
-                    closestBubble = b;
+                    closestBubble = node;
+                }
+
+                // Normalized distance [0..1+] from screen center
+                const norm = Math.min(1.4, dist / lensRadius);
+                // Smooth cubic falloff for dramatic watchOS center magnification
+                const factor = Math.pow(Math.max(0, 1 - norm * 0.78), 2.15);
+                const diameter = minDiameter + (maxDiameter - minDiameter) * factor;
+
+                // Radial inward compaction so shrunken outer bubbles stay tightly packed
+                const radialPull = 1 - 0.30 * Math.min(1, dist / (lensRadius * 1.15));
+                const screenX = centerX + rawX * radialPull - diameter * 0.5;
+                const screenY = centerY + rawY * radialPull - diameter * 0.5;
+
+                // Subtle edge fade while keeping outer circles clearly legible
+                const opacity = Math.max(0.45, Math.min(1, 0.52 + factor * 0.48));
+                const zIndex = Math.round(10 + factor * 30);
+
+                node.el.style.width = `${diameter.toFixed(1)}px`;
+                node.el.style.height = `${diameter.toFixed(1)}px`;
+                node.el.style.transform = `translate3d(${screenX.toFixed(1)}px, ${screenY.toFixed(1)}px, 0)`;
+                node.el.style.opacity = opacity.toFixed(2);
+                node.el.style.zIndex = zIndex;
+
+                // Dynamic full-text font size adjustment (never truncates with "...")
+                const fontSize = computeOptimalFontSize(node.lines, diameter);
+                if (Math.abs(fontSize - node.lastFontSize) > 0.25) {
+                    node.labelEl.style.fontSize = `${fontSize.toFixed(1)}px`;
+                    node.lastFontSize = fontSize;
                 }
             }
 
-            // 3. Update top center focus pill in real time
+            // Highlight the single center focal bubble
+            for (let i = 0; i < bubbleNodes.length; i++) {
+                const isFocal = bubbleNodes[i] === closestBubble && closestDist < 95;
+                bubbleNodes[i].el.classList.toggle('is-center-focal', isFocal);
+            }
+
+            // Update top center focus pill & trigger mechanical Digital Crown gear ticks
+            const frameDx = panX - lastRenderPanX;
+            const frameDy = panY - lastRenderPanY;
+            const frameStepDist = Math.hypot(frameDx, frameDy);
+            lastRenderPanX = panX;
+            lastRenderPanY = panY;
+
+            const currentSpeed = tweenActive
+                ? Math.min(1, frameStepDist / 26)
+                : Math.min(1, Math.hypot(velX, velY) / 28 + frameStepDist / 32);
+
+            let focalChangedThisFrame = false;
+
             if (closestBubble) {
                 focusNameEl.textContent = closestBubble.item.name;
                 focusDotEl.className = `w-2.5 h-2.5 rounded-full shrink-0 ${
                     closestBubble.item.type === 'Meal' ? 'bg-orange-500' : 'bg-blue-500'
                 }`;
+
+                if (lastCenterFocalId !== null && closestBubble.item.id !== lastCenterFocalId) {
+                    focalChangedThisFrame = true;
+                }
+                lastCenterFocalId = closestBubble.item.id;
+            }
+
+            if (!isRouletteRunning) {
+                if (focalChangedThisFrame) {
+                    accumTickDistance = 0;
+                    playGearTick(Math.max(0.28, currentSpeed), true);
+                } else if (frameStepDist > 0.05) {
+                    accumTickDistance += frameStepDist;
+                    if (accumTickDistance >= CROWN_STEP_PX) {
+                        accumTickDistance %= CROWN_STEP_PX;
+                        playGearTick(currentSpeed, false);
+                    }
+                }
+            } else {
+                accumTickDistance = 0;
             }
 
             requestAnimationFrame(renderFrame);
@@ -798,12 +742,12 @@
 
         /**
          * ============================================================================
-         * 6. POINTER SWIPE / DRAG & MOUSE WHEEL PANNING HANDLERS
+         * 6. POINTER SWIPE / DRAG & MOUSE WHEEL / TRACKPAD PANNING
          * ============================================================================
          */
         stageEl.addEventListener('pointerdown', (e) => {
+            unlockAudioContext();
             if (isRouletteRunning) return;
-            // Ignore clicks on UI overlays
             if (e.target.closest('button') || e.target.closest('nav') || e.target.closest('header')) return;
 
             isDragging = true;
@@ -811,575 +755,499 @@
             velX = 0;
             velY = 0;
             totalDragDist = 0;
-
+            accumTickDistance = CROWN_STEP_PX * 0.55;
             dragStartX = e.clientX;
             dragStartY = e.clientY;
             lastPointerX = e.clientX;
             lastPointerY = e.clientY;
-            lastPointerTime = performance.now();
         });
 
         window.addEventListener('pointermove', (e) => {
             if (!isDragging) return;
-            const now = performance.now();
-            const dt = Math.max(1, now - lastPointerTime);
-
-            const moveX = e.clientX - lastPointerX;
-            const moveY = e.clientY - lastPointerY;
-            totalDragDist += Math.hypot(moveX, moveY);
-
-            // Slight 1.15x gain makes swiping outer small bubbles into the center effortless
-            panX += moveX * 1.15;
-            panY += moveY * 1.15;
-
-            // Instantaneous velocity smoothed for buttery inertia on release
-            const instantVx = (moveX * 1.15 / dt) * 16.67;
-            const instantVy = (moveY * 1.15 / dt) * 16.67;
-            velX = velX * 0.45 + instantVx * 0.55;
-            velY = velY * 0.45 + instantVy * 0.55;
-
+            const dx = e.clientX - lastPointerX;
+            const dy = e.clientY - lastPointerY;
             lastPointerX = e.clientX;
             lastPointerY = e.clientY;
-            lastPointerTime = now;
+
+            totalDragDist += Math.hypot(dx, dy);
+            panX += dx;
+            panY += dy;
+
+            // Smooth velocity tracking for flick inertia
+            velX = velX * 0.35 + dx * 0.65;
+            velY = velY * 0.35 + dy * 0.65;
         });
 
         window.addEventListener('pointerup', () => {
             if (!isDragging) return;
             isDragging = false;
-            // If pointer stopped before lifting, dampen residual velocity
-            if (performance.now() - lastPointerTime > 65) {
-                velX *= 0.2;
-                velY *= 0.2;
-            }
         });
 
         window.addEventListener('pointercancel', () => {
             isDragging = false;
         });
 
-        // Support trackpad / mouse wheel panning as well
+        // Trackpad & mouse wheel scrolling
         stageEl.addEventListener('wheel', (e) => {
+            unlockAudioContext();
             if (isRouletteRunning) return;
             e.preventDefault();
             tweenActive = false;
-            panX -= e.deltaX * 0.85;
-            panY -= e.deltaY * 0.85;
+            const wheelDx = -e.deltaX * 0.85;
+            const wheelDy = -e.deltaY * 0.85;
+            panX += wheelDx;
+            panY += wheelDy;
+            velX = velX * 0.4 + wheelDx * 0.25;
+            velY = velY * 0.4 + wheelDy * 0.25;
         }, { passive: false });
+
+        ['touchstart', 'keydown'].forEach((evtName) => {
+            window.addEventListener(evtName, () => unlockAudioContext(), { passive: true });
+        });
 
         /**
          * ============================================================================
-         * 7. FUN WATCHOS ROULETTE RANDOMIZER + SYNTHESIZED CROWN TICKS & CONFETTI
+         * 7. MECHANICAL WATCH CROWN GEAR-TICK SYNTHESIZER (WEB AUDIO API)
          * ============================================================================
          */
         let audioCtx = null;
+        let noiseBuffer = null;
+        let soundEnabled = localStorage.getItem(SOUND_PREF_KEY) !== 'false';
+        let lastGearTickTime = 0;
+        const MIN_TICK_COOLDOWN_MS = 28;
 
-        function playTickSound(progress = 0.5, isWinner = false) {
+        function ensureAudioReady() {
             try {
                 if (!audioCtx) {
                     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-                    if (AudioContextClass) audioCtx = new AudioContextClass();
+                    if (AudioContextClass) {
+                        audioCtx = new AudioContextClass();
+                    }
                 }
-                if (!audioCtx) return;
-                if (audioCtx.state === 'suspended') audioCtx.resume();
-
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-
-                if (isWinner) {
-                    // Pleasant warm chime triad on winner reveal
-                    const notes = [523.25, 659.25, 783.99, 1046.5];
-                    notes.forEach((freq, idx) => {
-                        const o = audioCtx.createOscillator();
-                        const g = audioCtx.createGain();
-                        o.type = 'sine';
-                        o.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.06);
-                        g.gain.setValueAtTime(0.08, audioCtx.currentTime + idx * 0.06);
-                        g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + idx * 0.06 + 0.45);
-                        o.connect(g);
-                        g.connect(audioCtx.destination);
-                        o.start(audioCtx.currentTime + idx * 0.06);
-                        o.stop(audioCtx.currentTime + idx * 0.06 + 0.46);
-                    });
-                    return;
+                if (!audioCtx) return null;
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
                 }
-
-                // Crisp watchOS Digital Crown haptic-like click
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(420 + progress * 340, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.055, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.035);
-
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.04);
+                if (!noiseBuffer) {
+                    const length = Math.ceil(audioCtx.sampleRate * 0.022);
+                    noiseBuffer = audioCtx.createBuffer(1, length, audioCtx.sampleRate);
+                    const data = noiseBuffer.getChannelData(0);
+                    for (let i = 0; i < length; i++) {
+                        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (length * 0.22));
+                    }
+                }
+                return audioCtx;
             } catch (_) {
-                // Silent fallback if browser blocks audio
+                return null;
             }
         }
 
-        // Lightweight particle confetti burst on canvas
-        const fxCanvas = document.getElementById('fx-canvas');
-        const fxCtx = fxCanvas.getContext('2d');
-        let particles = [];
-
-        function resizeFxCanvas() {
-            fxCanvas.width = window.innerWidth;
-            fxCanvas.height = window.innerHeight;
+        function unlockAudioContext() {
+            if (!soundEnabled) return;
+            ensureAudioReady();
         }
 
-        function spawnConfettiBurst(accentColor) {
-            const cx = window.innerWidth / 2;
-            const cy = window.innerHeight / 2;
-            const colors = [accentColor, '#fde047', '#ffffff', '#38bdf8', '#fb923c'];
+        const btnToggleSound = document.getElementById('btn-toggle-sound');
+        const iconSoundOn = document.getElementById('icon-sound-on');
+        const iconSoundOff = document.getElementById('icon-sound-off');
+        const soundStatusLabel = document.getElementById('sound-status-label');
 
-            for (let i = 0; i < 48; i++) {
-                const angle = (Math.PI * 2 * i) / 48 + (Math.random() - 0.5) * 0.25;
-                const speed = 3.5 + Math.random() * 6.5;
-                particles.push({
-                    x: cx,
-                    y: cy,
-                    vx: Math.cos(angle) * speed,
-                    vy: Math.sin(angle) * speed - 1.5,
-                    size: 4 + Math.random() * 4.5,
-                    color: colors[i % colors.length],
-                    alpha: 1,
-                    decay: 0.015 + Math.random() * 0.012
-                });
-            }
-            if (particles.length <= 48) {
-                requestAnimationFrame(stepConfetti);
+        function syncSoundToggleUI() {
+            btnToggleSound.setAttribute('aria-pressed', String(soundEnabled));
+            iconSoundOn.classList.toggle('hidden', !soundEnabled);
+            iconSoundOff.classList.toggle('hidden', soundEnabled);
+            btnToggleSound.classList.toggle('text-emerald-300', soundEnabled);
+            btnToggleSound.classList.toggle('text-slate-400', !soundEnabled);
+            if (soundStatusLabel) {
+                soundStatusLabel.textContent = soundEnabled ? 'Sound On' : 'Muted';
             }
         }
+        syncSoundToggleUI();
 
-        function stepConfetti() {
-            fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
-            particles = particles.filter(p => p.alpha > 0.02);
+        btnToggleSound.addEventListener('click', (e) => {
+            e.stopPropagation();
+            soundEnabled = !soundEnabled;
+            try {
+                localStorage.setItem(SOUND_PREF_KEY, String(soundEnabled));
+            } catch (_) {}
+            syncSoundToggleUI();
 
-            for (const p of particles) {
-                p.x += p.vx;
-                p.y += p.vy;
-                p.vy += 0.16; // gentle gravity
-                p.vx *= 0.98;
-                p.alpha -= p.decay;
-
-                fxCtx.globalAlpha = Math.max(0, p.alpha);
-                fxCtx.fillStyle = p.color;
-                fxCtx.beginPath();
-                fxCtx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                fxCtx.fill();
+            if (soundEnabled) {
+                unlockAudioContext();
+                playGearTick(0.45, true);
             }
-            fxCtx.globalAlpha = 1;
+        });
 
-            if (particles.length > 0) {
-                requestAnimationFrame(stepConfetti);
-            }
-        }
+        function playGearTick(speedNorm = 0.3, isFocalCenterDetent = false) {
+            if (!soundEnabled) return;
+            const nowMs = performance.now();
+            if (nowMs - lastGearTickTime < MIN_TICK_COOLDOWN_MS) return;
+            lastGearTickTime = nowMs;
 
-        function triggerRandomRoulette() {
-            if (isRouletteRunning || activeBubbles.length === 0) return;
-            closeWinnerCard();
+            const ctx = ensureAudioReady();
+            if (!ctx || ctx.state !== 'running') return;
 
-            if (activeBubbles.length === 1) {
-                selectAndCenterBubble(activeBubbles[0], true);
-                return;
-            }
+            try {
+                const t = ctx.currentTime;
+                const clampedSpeed = Math.max(0, Math.min(1, speedNorm));
 
-            isRouletteRunning = true;
-            const totalSteps = 20;
-            let step = 0;
-            let lastIdx = -1;
+                const baseFreq = isFocalCenterDetent ? 2150 : 1850;
+                const pitchFreq = baseFreq + clampedSpeed * 520 + (Math.random() - 0.5) * 65;
+                const masterLevel = (isFocalCenterDetent ? 0.14 : 0.095) + clampedSpeed * 0.055;
 
-            // Pick final winner ahead of time so the last step lands cleanly on it
-            const winnerIdx = Math.floor(Math.random() * activeBubbles.length);
+                // 1. Short band-passed mechanical escapement transient (4.5 ms)
+                if (noiseBuffer) {
+                    const noiseSrc = ctx.createBufferSource();
+                    noiseSrc.buffer = noiseBuffer;
 
-            function hopNext() {
-                activeBubbles.forEach(b => b.el.classList.remove('is-roulette', 'is-selected'));
+                    const hpFilter = ctx.createBiquadFilter();
+                    hpFilter.type = 'bandpass';
+                    hpFilter.frequency.setValueAtTime(3200 + clampedSpeed * 900, t);
+                    hpFilter.Q.setValueAtTime(2.4, t);
 
-                let pickIdx;
-                if (step === totalSteps - 1) {
-                    pickIdx = winnerIdx;
-                } else {
-                    do {
-                        pickIdx = Math.floor(Math.random() * activeBubbles.length);
-                    } while (pickIdx === lastIdx && activeBubbles.length > 1);
+                    const noiseGain = ctx.createGain();
+                    noiseGain.gain.setValueAtTime(masterLevel * 1.15, t);
+                    noiseGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.0045);
+
+                    noiseSrc.connect(hpFilter);
+                    hpFilter.connect(noiseGain);
+                    noiseGain.connect(ctx.destination);
+
+                    noiseSrc.start(t);
+                    noiseSrc.stop(t + 0.006);
                 }
-                lastIdx = pickIdx;
 
-                const candidate = activeBubbles[pickIdx];
-                candidate.el.classList.add('is-roulette');
+                // 2. Pitched metallic gear-tooth impulse (~13 ms)
+                const osc = ctx.createOscillator();
+                const oscGain = ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(pitchFreq, t);
+                osc.frequency.exponentialRampToValueAtTime(pitchFreq * 0.52, t + 0.013);
 
-                const progress = step / (totalSteps - 1);
-                playTickSound(progress, false);
+                oscGain.gain.setValueAtTime(masterLevel, t);
+                oscGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.014);
 
-                // Dramatic decelerating interval: fast at start (65ms), slowing down near end (340ms)
-                const delay = Math.round(65 + Math.pow(progress, 2.3) * 280);
+                osc.connect(oscGain);
+                oscGain.connect(ctx.destination);
 
-                // Pan partially toward candidates during spin, and all the way to center on final pick
-                const pullFactor = step === totalSteps - 1 ? 1.0 : 0.68;
-                animatePanTo(-candidate.bx * pullFactor, -candidate.by * pullFactor, Math.max(60, delay * 0.85));
+                osc.start(t);
+                osc.stop(t + 0.016);
 
-                step++;
-                if (step < totalSteps) {
-                    setTimeout(hopNext, delay);
-                } else {
-                    setTimeout(() => {
-                        candidate.el.classList.remove('is-roulette');
-                        selectedBubbleId = candidate.item.id;
-                        candidate.el.classList.add('is-selected');
-                        isRouletteRunning = false;
-                        playTickSound(1, true);
-                        spawnConfettiBurst(candidate.item.type === 'Meal' ? '#f97316' : '#3b82f6');
-                        openWinnerCard(candidate.item);
-                    }, 360);
+                // 3. Low-end tactile body thump (~18 ms)
+                const bodyOsc = ctx.createOscillator();
+                const bodyGain = ctx.createGain();
+                bodyOsc.type = 'sine';
+                bodyOsc.frequency.setValueAtTime(isFocalCenterDetent ? 210 : 175, t);
+                bodyOsc.frequency.exponentialRampToValueAtTime(72, t + 0.018);
+
+                bodyGain.gain.setValueAtTime(masterLevel * (isFocalCenterDetent ? 0.85 : 0.55), t);
+                bodyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.019);
+
+                bodyOsc.connect(bodyGain);
+                bodyGain.connect(ctx.destination);
+
+                bodyOsc.start(t);
+                bodyOsc.stop(t + 0.021);
+            } catch (_) {}
+        }
+
+        function playRouletteSound(progress = 0.5, isWinner = false) {
+            if (!soundEnabled) return;
+            const ctx = ensureAudioReady();
+            if (!ctx) return;
+
+            try {
+                if (isWinner) {
+                    const notes = [659.25, 987.77, 1318.51];
+                    notes.forEach((freq, idx) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        const startAt = ctx.currentTime + idx * 0.065;
+                        o.type = 'sine';
+                        o.frequency.setValueAtTime(freq, startAt);
+                        g.gain.setValueAtTime(0.085, startAt);
+                        g.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.42);
+                        o.connect(g);
+                        g.connect(ctx.destination);
+                        o.start(startAt);
+                        o.stop(startAt + 0.44);
+                    });
+                    playGearTick(0.65, true);
+                    return;
                 }
-            }
-
-            hopNext();
+                playGearTick(0.25 + progress * 0.65, true);
+            } catch (_) {}
         }
 
         /**
          * ============================================================================
-         * 8. WINNER CARD & FILTER CONTROLS
+         * 8. FILTER BUTTONS & FUN ROULETTE RANDOMIZER
          * ============================================================================
          */
-        const winnerOverlay = document.getElementById('winner-overlay');
-        const winnerCard = document.getElementById('winner-card');
-        const winnerBadge = document.getElementById('winner-badge');
-        const winnerTitle = document.getElementById('winner-title');
+        const filterBtns = document.querySelectorAll('.filter-btn');
+        const winnerCardEl = document.getElementById('winner-card');
+        const winnerTitleEl = document.getElementById('winner-title');
+        const winnerTypePillEl = document.getElementById('winner-type-pill');
+        const winnerBadgeIconEl = document.getElementById('winner-badge-icon');
 
-        function openWinnerCard(item) {
-            winnerTitle.textContent = item.name;
-            winnerBadge.textContent = item.type;
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (isRouletteRunning) return;
+                unlockAudioContext();
+                playGearTick(0.4, true);
 
-            if (item.type === 'Meal') {
-                winnerBadge.className = 'px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-orange-500/25 text-orange-300 border border-orange-400/40';
-            } else {
-                winnerBadge.className = 'px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-blue-500/25 text-blue-300 border border-blue-400/40';
-            }
+                activeFilter = btn.dataset.filter;
+                filterBtns.forEach(b => {
+                    const isSelected = b.dataset.filter === activeFilter;
+                    b.classList.toggle('bg-white', isSelected);
+                    b.classList.toggle('text-slate-950', isSelected);
+                    b.classList.toggle('shadow', isSelected);
+                    if (!isSelected) {
+                        b.classList.remove('bg-white', 'text-slate-950', 'shadow');
+                    }
+                });
 
-            winnerOverlay.classList.remove('hidden');
-            requestAnimationFrame(() => {
-                winnerCard.classList.remove('scale-95', 'opacity-0');
-                winnerCard.classList.add('scale-100', 'opacity-100');
+                winnerCardEl.classList.add('hidden');
+                rebuildBubbles(true);
             });
-        }
-
-        function closeWinnerCard() {
-            winnerCard.classList.add('scale-95', 'opacity-0');
-            winnerCard.classList.remove('scale-100', 'opacity-100');
-            setTimeout(() => {
-                winnerOverlay.classList.add('hidden');
-            }, 220);
-        }
-
-        document.getElementById('btn-random').addEventListener('click', triggerRandomRoulette);
-        document.getElementById('btn-spin-again').addEventListener('click', triggerRandomRoulette);
-        document.getElementById('btn-close-winner').addEventListener('click', closeWinnerCard);
-        document.getElementById('btn-winner-done').addEventListener('click', closeWinnerCard);
-
-        document.getElementById('btn-recenter').addEventListener('click', () => {
-            if (isRouletteRunning) return;
-            closeWinnerCard();
-            animatePanTo(0, 0, 450);
         });
 
-        // Category Filter Pills
-        const filterPills = document.querySelectorAll('.filter-pill');
-        filterPills.forEach(pill => {
-            pill.addEventListener('click', () => {
-                if (isRouletteRunning) return;
-                const nextFilter = pill.dataset.filter;
-                if (nextFilter === activeFilter) {
-                    animatePanTo(0, 0, 380);
+        function showWinnerCard(item) {
+            winnerTitleEl.textContent = item.name;
+            const isMeal = item.type === 'Meal';
+            winnerTypePillEl.textContent = item.type;
+            winnerTypePillEl.className = `text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                isMeal ? 'bg-orange-500/30 text-orange-200' : 'bg-blue-500/30 text-blue-200'
+            }`;
+            winnerBadgeIconEl.className = `w-11 h-11 rounded-2xl flex items-center justify-center text-white font-extrabold text-xl shrink-0 shadow-inner ${
+                isMeal ? 'bg-orange-500/80' : 'bg-blue-500/80'
+            }`;
+            winnerBadgeIconEl.textContent = isMeal ? '🍛' : '🥨';
+            winnerCardEl.classList.remove('hidden');
+        }
+
+        function runRoulettePicker() {
+            if (isRouletteRunning || bubbleNodes.length === 0) return;
+            unlockAudioContext();
+            isRouletteRunning = true;
+            winnerCardEl.classList.add('hidden');
+
+            const totalSteps = Math.min(24, Math.max(14, bubbleNodes.length + 6));
+            const winnerIndex = Math.floor(Math.random() * bubbleNodes.length);
+            let step = 0;
+            let prevHighlighted = null;
+
+            function nextHop() {
+                if (prevHighlighted) {
+                    prevHighlighted.el.classList.remove('is-roulette-active');
+                }
+
+                const isLast = step >= totalSteps;
+                const chosenNode = isLast
+                    ? bubbleNodes[winnerIndex]
+                    : bubbleNodes[Math.floor(Math.random() * bubbleNodes.length)];
+
+                chosenNode.el.classList.add('is-roulette-active');
+                prevHighlighted = chosenNode;
+                centerOnBubble(chosenNode);
+
+                const progress = step / totalSteps;
+                if (isLast) {
+                    playRouletteSound(1, true);
+                    setTimeout(() => {
+                        chosenNode.el.classList.remove('is-roulette-active');
+                        isRouletteRunning = false;
+                        showWinnerCard(chosenNode.item);
+                    }, 450);
                     return;
                 }
 
-                activeFilter = nextFilter;
-                closeWinnerCard();
+                playRouletteSound(progress, false);
+                step++;
+                // Ease-out delay: starts fast like a spinning crown, slows down dramatically at the end
+                const delay = 65 + Math.pow(progress, 2.3) * 260;
+                setTimeout(nextHop, delay);
+            }
 
-                filterPills.forEach(p => {
-                    const isActive = p.dataset.filter === activeFilter;
-                    if (isActive) {
-                        p.className = 'filter-pill px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition cursor-pointer bg-white text-slate-950 shadow';
-                    } else {
-                        p.className = 'filter-pill px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition cursor-pointer text-slate-200 hover:bg-white/10 flex items-center gap-1.5';
-                    }
-                });
+            nextHop();
+        }
 
-                rebuildHoneycomb(true);
-            });
+        document.getElementById('btn-random').addEventListener('click', runRoulettePicker);
+        document.getElementById('btn-spin-again').addEventListener('click', runRoulettePicker);
+        document.getElementById('btn-close-winner').addEventListener('click', () => {
+            winnerCardEl.classList.add('hidden');
         });
 
         /**
          * ============================================================================
-         * 9. GOOGLE SHEET CSV SYNC, QUICK ADD & BULK PASTE MODAL
+         * 9. GOOGLE SHEET CSV SYNC, QUICK-ADD & BULK PASTE MODAL
          * ============================================================================
          */
-        const syncModal = document.getElementById('sync-modal');
-        const syncStatusEl = document.getElementById('sync-status');
-        const bulkTextarea = document.getElementById('bulk-textarea');
-        const quickAddNameInput = document.getElementById('quick-add-name');
-        let quickAddType = 'Meal';
+        const syncModalEl = document.getElementById('sync-modal');
+        const sheetUrlInputEl = document.getElementById('sheet-url-input');
+        const syncStatusMsgEl = document.getElementById('sync-status-msg');
 
-        function showSyncStatus(message, tone = 'info') {
-            syncStatusEl.classList.remove('hidden');
-            if (tone === 'success') {
-                syncStatusEl.className = 'text-xs rounded-xl p-3 leading-relaxed bg-emerald-500/15 text-emerald-200 border border-emerald-400/30';
-            } else if (tone === 'error') {
-                syncStatusEl.className = 'text-xs rounded-xl p-3 leading-relaxed bg-rose-500/15 text-rose-200 border border-rose-400/30';
-            } else {
-                syncStatusEl.className = 'text-xs rounded-xl p-3 leading-relaxed bg-sky-500/15 text-sky-200 border border-sky-400/30';
+        sheetUrlInputEl.value = localStorage.getItem(STORAGE_KEY_SHEET_URL) || DEFAULT_SHEET_URL;
+
+        function showSyncStatus(message, isError = false) {
+            syncStatusMsgEl.textContent = message;
+            syncStatusMsgEl.className = `mt-3 px-3.5 py-2.5 rounded-2xl text-xs font-semibold ${
+                isError
+                    ? 'bg-rose-500/20 text-rose-200 border border-rose-500/30'
+                    : 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/30'
+            }`;
+            syncStatusMsgEl.classList.remove('hidden');
+        }
+
+        function normalizeGoogleSheetCsvUrl(rawUrl) {
+            const trimmed = rawUrl.trim();
+            if (!trimmed) return '';
+            // If already a published CSV link, return as-is
+            if (trimmed.includes('output=csv') || trimmed.includes('format=csv')) {
+                return trimmed;
             }
-            syncStatusEl.innerHTML = message;
-        }
-
-        function openSyncModal() {
-            syncModal.classList.remove('hidden');
-            syncModal.classList.add('flex');
-        }
-
-        function closeSyncModal() {
-            syncModal.classList.add('hidden');
-            syncModal.classList.remove('flex');
-        }
-
-        document.getElementById('btn-open-sync').addEventListener('click', openSyncModal);
-        document.getElementById('btn-close-sync').addEventListener('click', closeSyncModal);
-        syncModal.addEventListener('click', (e) => {
-            if (e.target === syncModal) closeSyncModal();
-        });
-
-        // Quick Add Type Toggle
-        const btnQuickMeal = document.getElementById('quick-type-meal');
-        const btnQuickSnack = document.getElementById('quick-type-snack');
-
-        function setQuickType(type) {
-            quickAddType = type;
-            if (type === 'Meal') {
-                btnQuickMeal.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-orange-500 text-white transition cursor-pointer';
-                btnQuickSnack.className = 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer';
-            } else {
-                btnQuickSnack.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-500 text-white transition cursor-pointer';
-                btnQuickMeal.className = 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer';
+            // Convert standard /spreadsheets/d/{ID}/edit... URL to /export?format=csv
+            const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+            if (match && match[1]) {
+                const gidMatch = trimmed.match(/gid=([0-9]+)/);
+                const gidParam = gidMatch ? `&gid=${gidMatch[1]}` : '';
+                return `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv${gidParam}`;
             }
+            return trimmed;
         }
 
-        btnQuickMeal.addEventListener('click', () => setQuickType('Meal'));
-        btnQuickSnack.addEventListener('click', () => setQuickType('Snack'));
+        function parseFoodRows(rawText) {
+            const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            const results = [];
 
-        function handleQuickAdd() {
-            const rawName = quickAddNameInput.value.trim();
-            if (!rawName) return;
+            for (const line of lines) {
+                // Split by tab (Excel/Sheets copy-paste) or comma
+                const parts = line.includes('\t')
+                    ? line.split('\t')
+                    : line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
 
-            const newItem = {
-                id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                name: rawName,
-                type: quickAddType
-            };
-            inventory.push(newItem);
-            saveInventory(inventory);
-            quickAddNameInput.value = '';
-            rebuildHoneycomb(false);
-            showSyncStatus(`Added <strong>${escapeHtml(rawName)}</strong> (${quickAddType}).`, 'success');
-        }
+                const cleanParts = parts.map(p => p.replace(/^"|"$/g, '').trim()).filter(Boolean);
+                if (cleanParts.length === 0) continue;
 
-        document.getElementById('btn-quick-add').addEventListener('click', handleQuickAdd);
-        quickAddNameInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') handleQuickAdd();
-        });
+                const firstCol = cleanParts[0];
+                const secondCol = cleanParts[1] || '';
 
-        function escapeHtml(str) {
-            return str.replace(/[&<>"']/g, m => ({
-                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-            }[m]));
-        }
-
-        /**
-         * Parses CSV or TSV rows in BOTH possible spreadsheet layouts:
-         * Layout A (Row-tagged): "Food Name, Meal" or "Food Name\tSnack"
-         * Layout B (Two-column): Header "Meal, Snack" with meals in col 0 and snacks in col 1
-         */
-        function parseSpreadsheetText(rawText) {
-            const lines = rawText
-                .split(/\r?\n/)
-                .map(line => line.trim())
-                .filter(Boolean);
-
-            if (lines.length === 0) return [];
-
-            const splitRow = (line) => {
-                if (line.includes('\t')) {
-                    return line.split('\t').map(cell => cell.trim().replace(/^"|"$/g, ''));
-                }
-                // CSV split honoring quoted strings
-                const cells = [];
-                let current = '';
-                let inQuotes = false;
-                for (let i = 0; i < line.length; i++) {
-                    const ch = line[i];
-                    if (ch === '"') {
-                        inQuotes = !inQuotes;
-                    } else if (ch === ',' && !inQuotes) {
-                        cells.push(current.trim());
-                        current = '';
-                    } else {
-                        current += ch;
-                    }
-                }
-                cells.push(current.trim());
-                return cells;
-            };
-
-            const rows = lines.map(splitRow);
-            const firstRowLower = rows[0].map(c => c.toLowerCase());
-
-            // Check Layout B: Two-column header like ["meal", "snack"] or ["meals", "snacks"]
-            const mealColIdx = firstRowLower.findIndex(c => c === 'meal' || c === 'meals');
-            const snackColIdx = firstRowLower.findIndex(c => c === 'snack' || c === 'snacks');
-
-            const parsedItems = [];
-            let uid = Date.now();
-
-            if (mealColIdx !== -1 && snackColIdx !== -1 && mealColIdx !== snackColIdx) {
-                for (let r = 1; r < rows.length; r++) {
-                    const mealName = (rows[r][mealColIdx] || '').trim();
-                    const snackName = (rows[r][snackColIdx] || '').trim();
-                    if (mealName) {
-                        parsedItems.push({ id: `item-${uid++}`, name: mealName, type: 'Meal' });
-                    }
-                    if (snackName) {
-                        parsedItems.push({ id: `item-${uid++}`, name: snackName, type: 'Snack' });
-                    }
-                }
-                return parsedItems;
-            }
-
-            // Otherwise Layout A: [Food Name, Type] per row
-            for (let r = 0; r < rows.length; r++) {
-                const col0 = (rows[r][0] || '').trim();
-                const col1 = (rows[r][1] || '').trim().toLowerCase();
-
-                // Skip header row like "Food, Type" or "Item, Category"
-                if (r === 0 && (col1 === 'type' || col1 === 'category' || col0.toLowerCase() === 'food' || col0.toLowerCase() === 'item')) {
+                // Skip header rows
+                if (/^(food|item|name|dish)$/i.test(firstCol) && /^(type|category|meal|snack)/i.test(secondCol)) {
                     continue;
                 }
-                if (!col0) continue;
 
-                let type = null;
-                if (col1.includes('meal')) type = 'Meal';
-                else if (col1.includes('snack')) type = 'Snack';
+                const isMeal = /meal/i.test(secondCol);
+                const isSnack = /snack/i.test(secondCol);
+                const detectedType = isMeal ? 'Meal' : (isSnack ? 'Snack' : 'Meal');
 
-                if (type) {
-                    parsedItems.push({ id: `item-${uid++}`, name: col0, type });
-                }
+                results.push({
+                    id: `food-${results.length}-${firstCol}`,
+                    name: firstCol,
+                    type: detectedType
+                });
             }
-
-            return parsedItems;
+            return results;
         }
 
-        // Live Google Sheet Fetch
+        document.getElementById('btn-open-sync').addEventListener('click', () => {
+            syncStatusMsgEl.classList.add('hidden');
+            syncModalEl.classList.remove('hidden');
+            syncModalEl.classList.add('flex');
+        });
+
+        document.getElementById('btn-close-sync').addEventListener('click', () => {
+            syncModalEl.classList.add('hidden');
+            syncModalEl.classList.remove('flex');
+        });
+
+        syncModalEl.addEventListener('click', (e) => {
+            if (e.target === syncModalEl) {
+                syncModalEl.classList.add('hidden');
+                syncModalEl.classList.remove('flex');
+            }
+        });
+
         document.getElementById('btn-fetch-sheet').addEventListener('click', async () => {
-            showSyncStatus('Fetching latest CSV from Google Sheets...', 'info');
+            const rawUrl = sheetUrlInputEl.value.trim();
+            if (!rawUrl) {
+                showSyncStatus('Please enter a valid Google Sheet URL.', true);
+                return;
+            }
+            localStorage.setItem(STORAGE_KEY_SHEET_URL, rawUrl);
+            const csvUrl = normalizeGoogleSheetCsvUrl(rawUrl);
+            showSyncStatus('Fetching latest foods from Google Sheets...');
+
             try {
-                const response = await fetch(GOOGLE_SHEET_CSV_URL, { cache: 'no-store' });
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                const resp = await fetch(csvUrl, { cache: 'no-store' });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const csvText = await resp.text();
+                if (csvText.trim().startsWith('<!DOCTYPE html')) {
+                    throw new Error('Sheet is private. Set sharing to "Anyone with the link" or Publish to web (CSV).');
                 }
-                const csvText = await response.text();
-                if (csvText.trim().startsWith('<!DOCTYPE html') || csvText.includes('ServiceLogin')) {
-                    throw new Error('Sheet is private or requires Google login');
+                const parsed = parseFoodRows(csvText);
+                if (parsed.length === 0) {
+                    throw new Error('No food rows found in the sheet.');
                 }
-
-                const fetched = parseSpreadsheetText(csvText);
-                if (fetched.length === 0) {
-                    throw new Error('No Meal/Snack rows detected in sheet');
-                }
-
-                inventory = fetched;
-                saveInventory(inventory);
-                rebuildHoneycomb(true);
-                showSyncStatus(`Synced <strong>${fetched.length} items</strong> directly from your Google Sheet!`, 'success');
+                allFoods = parsed;
+                saveFoods(allFoods);
+                rebuildBubbles(true);
+                showSyncStatus(`Synced ${allFoods.length} items from Google Sheets!`);
             } catch (err) {
-                showSyncStatus(
-                    `Could not fetch directly (${escapeHtml(err.message)}). If your sheet isn't set to <em>"Anyone with the link can view"</em>, simply select & copy your cells in Google Sheets and paste them into <strong>Bulk Paste / Edit</strong> below.`,
-                    'error'
-                );
+                showSyncStatus(`Could not fetch directly (${err.message}). You can also copy-paste rows in Step 3 below.`, true);
             }
         });
 
-        // Bulk Paste Actions
-        document.getElementById('btn-load-current-text').addEventListener('click', () => {
-            bulkTextarea.value = inventory.map(i => `${i.name}, ${i.type}`).join('\n');
+        document.getElementById('btn-quick-add').addEventListener('click', () => {
+            const nameInput = document.getElementById('quick-food-name');
+            const typeSelect = document.getElementById('quick-food-type');
+            const name = nameInput.value.trim();
+            if (!name) {
+                showSyncStatus('Type a food name first.', true);
+                return;
+            }
+            const newItem = {
+                id: `food-${Date.now()}-${name}`,
+                name,
+                type: typeSelect.value === 'Meal' ? 'Meal' : 'Snack'
+            };
+            allFoods.unshift(newItem);
+            saveFoods(allFoods);
+            nameInput.value = '';
+            rebuildBubbles(true);
+            showSyncStatus(`Added "${newItem.name}" (${newItem.type}) to the center!`);
         });
 
-        document.getElementById('btn-bulk-append').addEventListener('click', () => {
-            const parsed = parseSpreadsheetText(bulkTextarea.value);
+        document.getElementById('btn-apply-paste').addEventListener('click', () => {
+            const pasteText = document.getElementById('bulk-paste-input').value;
+            const parsed = parseFoodRows(pasteText);
             if (parsed.length === 0) {
-                showSyncStatus('No valid rows found. Use format: <code>Food Name, Meal</code> or <code>Food Name, Snack</code>.', 'error');
+                showSyncStatus('Paste at least one row like: Puran Poli, Meal', true);
                 return;
             }
-            inventory = inventory.concat(parsed);
-            saveInventory(inventory);
-            rebuildHoneycomb(false);
-            bulkTextarea.value = '';
-            showSyncStatus(`Appended <strong>${parsed.length} items</strong> to your honeycomb.`, 'success');
+            allFoods = parsed;
+            saveFoods(allFoods);
+            document.getElementById('bulk-paste-input').value = '';
+            rebuildBubbles(true);
+            showSyncStatus(`Updated list with ${allFoods.length} pasted items!`);
         });
 
-        document.getElementById('btn-bulk-replace').addEventListener('click', () => {
-            const parsed = parseSpreadsheetText(bulkTextarea.value);
-            if (parsed.length === 0) {
-                showSyncStatus('No valid rows found. Use format: <code>Food Name, Meal</code> or <code>Food Name, Snack</code>.', 'error');
-                return;
-            }
-            inventory = parsed;
-            saveInventory(inventory);
-            rebuildHoneycomb(true);
-            bulkTextarea.value = '';
-            showSyncStatus(`Replaced list with <strong>${parsed.length} items</strong>.`, 'success');
+        document.getElementById('btn-reset-default').addEventListener('click', () => {
+            allFoods = DEFAULT_FOODS.map((item, idx) => ({
+                id: `food-${idx}-${item.name}`,
+                name: item.name,
+                type: item.type
+            }));
+            saveFoods(allFoods);
+            rebuildBubbles(true);
+            showSyncStatus('Restored original 31 items from your sheet.');
         });
 
-        // Two-step inline Reset button (avoids browser confirm())
-        const btnReset = document.getElementById('btn-reset-default');
-        let resetArmed = false;
-        let resetTimer = null;
-
-        btnReset.addEventListener('click', () => {
-            if (!resetArmed) {
-                resetArmed = true;
-                btnReset.textContent = 'Click again to confirm reset';
-                btnReset.classList.add('bg-rose-500/20');
-                resetTimer = setTimeout(() => {
-                    resetArmed = false;
-                    btnReset.textContent = 'Reset to Default (31)';
-                    btnReset.classList.remove('bg-rose-500/20');
-                }, 3500);
-                return;
-            }
-            clearTimeout(resetTimer);
-            resetArmed = false;
-            btnReset.textContent = 'Reset to Default (31)';
-            btnReset.classList.remove('bg-rose-500/20');
-
-            inventory = buildDefaultInventory();
-            saveInventory(inventory);
-            rebuildHoneycomb(true);
-            showSyncStatus('Restored original <strong>31 items</strong> (12 Meals, 19 Snacks).', 'success');
+        // Initialize bubbles & start 60fps animation loop on load
+        window.addEventListener('load', () => {
+            rebuildBubbles(true);
+            requestAnimationFrame(renderFrame);
         });
-
-        /**
-         * ============================================================================
-         * 10. INITIALIZATION & RESIZE HANDLING
-         * ============================================================================
-         */
-        window.addEventListener('resize', () => {
-            rebuildLensLUT();
-            resizeFxCanvas();
-        });
-
-        rebuildLensLUT();
-        resizeFxCanvas();
-        rebuildHoneycomb(true);
     </script>
 </body>
 </html>
